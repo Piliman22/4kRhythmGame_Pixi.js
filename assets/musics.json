@@ -1,0 +1,40 @@
+{
+    "musics": [
+        {
+            "id": "01",
+            "title": "シャイニングスター",
+            "artist": "魔王魂",
+            "bpm": 158,
+            "difficulty": "Normal",
+            "rating": 5,
+            "chartIndex": 0
+        },
+        {
+            "id": "02",
+            "title": "アンパンマンのマーチ",
+            "artist": "ドリーミング",
+            "bpm": 96,
+            "difficulty": "Normal",
+            "rating": 1,
+            "chartIndex": 1
+        },
+        {
+            "id": "03",
+            "title": "楽曲3",
+            "artist": "Artist 3",
+            "bpm": 180,
+            "difficulty": "Expert",
+            "rating": 9,
+            "chartIndex": 2
+        },
+        {
+            "id": "04",
+            "title": "楽曲4",
+            "artist": "Artist 4",
+            "bpm": 200,
+            "difficulty": "Extend",
+            "rating": 10,
+            "chartIndex": 3
+        }
+    ]
+}
