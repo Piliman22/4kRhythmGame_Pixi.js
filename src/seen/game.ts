@@ -677,8 +677,13 @@ export class GameScene extends Scene {
                 gameHold.keyHeldDown = this.keysHeld[gameHold.holdData.position];
                 gameHold.isActive = gameHold.keyHeldDown;
 
-                // ホールドが開始されたら位置を固定（判定線の上端に）
-                gameHold.positionY = this.JUDGMENT_LINE_Y - gameHold.originalBodyHeight;
+                if (gameHold.isActive) {
+                    // キーが押されている間は位置を固定（判定線の上端に）
+                    gameHold.positionY = this.JUDGMENT_LINE_Y - gameHold.originalBodyHeight;
+                } else {
+                    // キーが離されている場合は通常通り落下
+                    gameHold.positionY += this.NOTE_SPEED * deltaTime / 60;
+                }
 
                 // 進行度を更新
                 this.updateHoldProgress(gameHold, deltaTime);
@@ -688,10 +693,18 @@ export class GameScene extends Scene {
             gameHold.bodyGraphic.y = gameHold.positionY;
 
             // ホールドノートの削除判定
-            // 長いホールドノートが途中で消えないよう、endTimeに到達した場合のみ削除
-            const shouldRemove = currentTime >= gameHold.holdData.endTime + 100; // 少し余裕を持たせる
+            const shouldRemove = currentTime >= gameHold.holdData.endTime + 100 || // endTimeに到達
+                               (gameHold.positionY > 650); // 画面外に出た（キーが離されて落下した場合）
 
             if (shouldRemove) {
+                // 画面外に出た場合はMISS判定
+                if (gameHold.positionY > 650 && gameHold.isStartHit && this.combo > 0) {
+                    this.combo = 0;
+                    this.updateCombo();
+                    this.showJudgment('MISS', 0xff0000);
+                    this.missCount++;
+                }
+                
                 this.container.removeChild(gameHold.bodyGraphic);
                 this.container.removeChild(gameHold.endGraphic);
                 this.gameHolds.splice(i, 1);

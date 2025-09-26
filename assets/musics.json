@@ -11,9 +11,9 @@
         },
         {
             "id": "02",
-            "title": "アンパンマンのマーチ",
-            "artist": "ドリーミング",
-            "bpm": 96,
+            "title": "校歌",
+            "artist": "中村孝也",
+            "bpm": 114,
             "difficulty": "Normal",
             "rating": 1,
             "chartIndex": 1
@@ -24,15 +24,15 @@
             "artist": "魔王魂",
             "bpm": 195,
             "difficulty": "Hard",
-            "rating": 10,
+            "rating": 7,
             "chartIndex": 2
         },
         {
             "id": "04",
-            "title": "楽曲4",
-            "artist": "Artist 4",
-            "bpm": 200,
-            "difficulty": "Extend",
+            "title": "Psyched Fevereiro",
+            "artist": "t+pazolite",
+            "bpm": 150,
+            "difficulty": "Hard",
             "rating": 10,
             "chartIndex": 3
         }

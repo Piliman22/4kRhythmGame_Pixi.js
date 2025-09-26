@@ -70,7 +70,7 @@ def convert_usc_to_custom_chart(usc_data):
 
     return chart
 
-with open('12345n.usc', 'r', encoding='utf-8') as f:
+with open('aaa.usc', 'r', encoding='utf-8') as f:
     usc_data = json.load(f)
 
 converted_chart = convert_usc_to_custom_chart(usc_data)
