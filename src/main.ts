@@ -26,7 +26,13 @@ async function main() {
     sceneManager.registerScene('title', () => new TitleScene(app, onSceneChange));
     sceneManager.registerScene('select', () => new SelectScene(app, onSceneChange));
     sceneManager.registerScene('game', () => new GameScene(app, onSceneChange));
-    sceneManager.registerScene('result', () => new ResultScene(app, onSceneChange, currentSceneData?.score || 0));
+    sceneManager.registerScene('result', () => new ResultScene(
+        app, 
+        onSceneChange, 
+        currentSceneData?.score || 0,
+        currentSceneData?.missCount || 0,
+        currentSceneData?.goodCount || 0
+    ));
 
     // 更新ループ
     app.ticker.add((ticker: PIXI.Ticker) => {

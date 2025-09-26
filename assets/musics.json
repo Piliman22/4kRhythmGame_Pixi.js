@@ -20,11 +20,11 @@
         },
         {
             "id": "03",
-            "title": "楽曲3",
-            "artist": "Artist 3",
-            "bpm": 180,
-            "difficulty": "Expert",
-            "rating": 9,
+            "title": "12345",
+            "artist": "魔王魂",
+            "bpm": 195,
+            "difficulty": "Hard",
+            "rating": 10,
             "chartIndex": 2
         },
         {

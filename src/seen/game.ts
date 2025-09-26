@@ -7,6 +7,7 @@ interface GameNote {
     graphic: PIXI.Graphics;
     noteData: Note;
     startTime: number;
+    isHoldStart?: boolean;
 }
 
 interface GameHold {
@@ -38,7 +39,9 @@ export class GameScene extends Scene {
     private gameStartTime: number = 0;
     private keyLabels: PIXI.Text[] = [];
     private keysHeld: boolean[] = [false, false, false, false]; // 各レーンのキー状態
-    
+    private missCount: number = 0;
+    private goodCount: number = 0;
+
     // 音声関連
     private normalSound!: HTMLAudioElement;
     private criticalSound!: HTMLAudioElement;
@@ -64,7 +67,7 @@ export class GameScene extends Scene {
     private readonly LANE_COUNT = 4;
     private readonly LANE_WIDTH = 150;
     private readonly LANE_START_X = 100;
-    private readonly JUDGMENT_LINE_Y = 550;
+    private readonly JUDGMENT_LINE_Y = 450;
     private readonly NOTE_SPEED = 400; // ピクセル/秒
 
     constructor(app: PIXI.Application, onSceneChange: (sceneName: string, data?: any) => void) {
@@ -75,7 +78,7 @@ export class GameScene extends Scene {
     async start(): Promise<void> {
         // ゲーム画面のUI
         this.setupUI();
-        
+
         // 4レーンの判定ラインとレーン区切り線を作成
         this.setupLanes();
 
@@ -138,7 +141,7 @@ export class GameScene extends Scene {
             } else {
                 this.bgmSound.addEventListener('canplaythrough', onCanPlay);
                 this.bgmSound.addEventListener('error', onError);
-                
+
                 // タイムアウト（10秒後に諦める）
                 setTimeout(() => {
                     console.warn('BGM load timeout, continuing without BGM');
@@ -218,7 +221,7 @@ export class GameScene extends Scene {
     private showLoadingOverlay(): void {
         // ローディングオーバーレイの作成
         this.loadingOverlay = new PIXI.Container();
-        
+
         // 半透明の背景
         const overlay = new PIXI.Graphics();
         overlay.rect(0, 0, 800, 600).fill(0x000000);
@@ -299,7 +302,7 @@ export class GameScene extends Scene {
                 }
             });
             keyLabel.x = this.LANE_START_X + i * this.LANE_WIDTH + this.LANE_WIDTH / 2 - keyLabel.width / 2;
-            keyLabel.y = this.JUDGMENT_LINE_Y + 20;
+            keyLabel.y = this.JUDGMENT_LINE_Y + 30; // 20から30に調整
             this.keyLabels.push(keyLabel);
             this.container.addChild(keyLabel);
         }
@@ -314,7 +317,7 @@ export class GameScene extends Scene {
                 case 'KeyJ': lane = 2; break;
                 case 'KeyK': lane = 3; break;
             }
-            
+
             if (lane >= 0 && !this.keysHeld[lane]) {
                 event.preventDefault();
                 this.keysHeld[lane] = true;
@@ -331,7 +334,7 @@ export class GameScene extends Scene {
                 case 'KeyJ': lane = 2; break;
                 case 'KeyK': lane = 3; break;
             }
-            
+
             if (lane >= 0) {
                 event.preventDefault();
                 this.keysHeld[lane] = false;
@@ -341,7 +344,7 @@ export class GameScene extends Scene {
 
         document.addEventListener('keydown', handleKeyPress);
         document.addEventListener('keyup', handleKeyRelease);
-        
+
         // シーンが終了するときにリスナーを削除するために保存
         (this as any).keydownHandler = handleKeyPress;
         (this as any).keyupHandler = handleKeyRelease;
@@ -396,83 +399,121 @@ export class GameScene extends Scene {
         }
     }
 
-    private spawnNote(noteData: Note): void {
+    private spawnNote(noteData: Note, isHoldStart: boolean = false): void {
         const note = new PIXI.Graphics();
         const x = this.LANE_START_X + noteData.position * this.LANE_WIDTH + 10;
         const width = this.LANE_WIDTH - 20;
         const height = 20;
-        
-        // ノートタイプによって色を変える
+
         const color = noteData.type === 'critical' ? 0xfff200 : 0x00ffff;
         note.rect(0, 0, width, height).fill(color);
         note.x = x;
         note.y = -height;
-        
+
         const gameNote: GameNote = {
             graphic: note,
             noteData: noteData,
-            startTime: Date.now()
+            startTime: Date.now(),
+            isHoldStart: isHoldStart  // フラグを設定
         };
-        
+
         this.gameNotes.push(gameNote);
         this.container.addChild(note);
     }
 
     private hitNote(lane: number): void {
-        // 通常ノートの判定
-        for (let i = this.gameNotes.length - 1; i >= 0; i--) {
-            const gameNote = this.gameNotes[i];
-            
-            if (gameNote.noteData.position !== lane) continue;
-            
+        let closestNote: GameNote | null = null;
+        let closestDistance: number = Infinity;
+
+        const isHoldActive = this.gameHolds.some(hold =>
+            hold.holdData.position === lane &&
+            hold.isStartHit &&
+            hold.isActive
+        );
+
+        if (isHoldActive) {
+            return;
+        }
+
+        // 判定範囲内で最も近いノートを探す
+        const notesInLane = this.gameNotes
+            .filter(gameNote => gameNote.noteData.position === lane)
+            .sort((a, b) => a.noteData.time - b.noteData.time);
+
+        for (const gameNote of notesInLane) {
             const distance = Math.abs(gameNote.graphic.y - this.JUDGMENT_LINE_Y);
 
-            if (distance < 50) { // 判定範囲内
-                // ノートを削除
-                this.container.removeChild(gameNote.graphic);
-                this.gameNotes.splice(i, 1);
-                
-                // スコア加算と判定
-                let points = 0;
-                let hitType: 'normal' | 'critical' = 'normal';
-                let judgment = '';
-                let judgmentColor = 0xffffff;
-                
-                if (distance < 20) {
-                    points = gameNote.noteData.type === 'critical' ? 200 : 100;
-                    hitType = gameNote.noteData.type === 'critical' ? 'critical' : 'normal';
-                    judgment = 'JUST';
-                    judgmentColor = 0x00ff00;
-                } else if (distance < 34) {
-                    points = gameNote.noteData.type === 'critical' ? 150 : 75;
-                    hitType = gameNote.noteData.type === 'critical' ? 'critical' : 'normal';
-                    judgment = 'GREAT';
-                    judgmentColor = 0xffff00;
-                } else {
-                    points = gameNote.noteData.type === 'critical' ? 100 : 50;
-                    hitType = gameNote.noteData.type === 'critical' ? 'critical' : 'normal';
-                    judgment = 'GOOD';
-                    judgmentColor = 0xff8800;
+            // 判定範囲内（50ピクセル）で最も近いものを選択
+            if (distance < 50 && distance < closestDistance) {
+                // ホールドノートの終点でないことを確認
+                const isHoldEnd = this.gameHolds.some(hold =>
+                    hold.holdData.position === lane &&
+                    hold.holdData.endTime === gameNote.noteData.time
+                );
+
+                if (!isHoldEnd) {
+                    closestNote = gameNote;
+                    closestDistance = distance;
                 }
-                
-                // コンボ増加
-                this.combo++;
-                
-                this.score += points;
-                this.updateScore();
-                this.updateCombo();
-                
-                // 判定表示とエフェクト
-                this.showJudgment(judgment, judgmentColor);
-                this.createHitEffect(lane, judgment);
-                
-                // 音声再生（missでない場合のみ）
-                this.playHitSound(hitType);
-                
-                // このノートがホールドノートの始点かチェック
-                this.checkHoldStart(lane, gameNote.noteData.time);
-                return;
             }
+        }
+
+        // 最も近いノートが見つかった場合の処理
+        if (closestNote) {
+
+            if (closestNote.isHoldStart) {
+                console.log('hold start');
+                this.checkHoldStart(lane, closestNote.noteData.time);
+            }
+
+            // 通常の削除処理
+            this.container.removeChild(closestNote.graphic);
+            const index = this.gameNotes.indexOf(closestNote);
+            if (index > -1) {
+                this.gameNotes.splice(index, 1);
+            }
+
+
+            // スコア加算と判定
+            let points = 0;
+            let hitType: 'normal' | 'critical' = 'normal';
+            let judgment = '';
+            let judgmentColor = 0xffffff;
+
+            if (closestDistance < 30) {
+                points = closestNote.noteData.type === 'critical' ? 200 : 100;
+                hitType = closestNote.noteData.type === 'critical' ? 'critical' : 'normal';
+                judgment = 'JUST';
+                judgmentColor = 0x00ff00;
+            } else if (closestDistance < 45) {
+                points = closestNote.noteData.type === 'critical' ? 150 : 75;
+                hitType = closestNote.noteData.type === 'critical' ? 'critical' : 'normal';
+                judgment = 'GREAT';
+                judgmentColor = 0xffff00;
+            } else {
+                points = closestNote.noteData.type === 'critical' ? 100 : 50;
+                hitType = closestNote.noteData.type === 'critical' ? 'critical' : 'normal';
+                judgment = 'GOOD';
+                judgmentColor = 0xff8800;
+                this.goodCount++; // グッドカウントの増加
+            }
+
+            // コンボ増加
+            this.combo++;
+
+            this.score += points;
+            this.updateScore();
+            this.updateCombo();
+
+            // 判定表示とエフェクト
+            this.showJudgment(judgment, judgmentColor);
+            this.createHitEffect(lane, judgment);
+
+            // 音声再生
+            this.playHitSound(hitType);
+
+            // このノートがホールドノートの始点かチェック
+            this.checkHoldStart(lane, closestNote.noteData.time);
         }
     }
 
@@ -613,8 +654,9 @@ export class GameScene extends Scene {
                     this.combo = 0;
                     this.updateCombo();
                     this.showJudgment('MISS', 0xff0000);
+                    this.missCount++;
                 }
-                
+
                 this.container.removeChild(gameNote.graphic);
                 this.gameNotes.splice(i, 1);
             }
@@ -623,10 +665,10 @@ export class GameScene extends Scene {
         // ホールドノートの更新
         for (let i = this.gameHolds.length - 1; i >= 0; i--) {
             const gameHold = this.gameHolds[i];
-            
+
             // 常にエンドグラフィックは移動
             gameHold.endGraphic.y += this.NOTE_SPEED * deltaTime / 60;
-            
+
             if (!gameHold.isStartHit) {
                 // まだ始点がヒットされていない場合は通常通り移動
                 gameHold.positionY += this.NOTE_SPEED * deltaTime / 60;
@@ -634,10 +676,10 @@ export class GameScene extends Scene {
                 // 始点がヒットされた後の処理
                 gameHold.keyHeldDown = this.keysHeld[gameHold.holdData.position];
                 gameHold.isActive = gameHold.keyHeldDown;
-                
+
                 // ホールドが開始されたら位置を固定（判定線の上端に）
                 gameHold.positionY = this.JUDGMENT_LINE_Y - gameHold.originalBodyHeight;
-                
+
                 // 進行度を更新
                 this.updateHoldProgress(gameHold, deltaTime);
             }
@@ -648,7 +690,7 @@ export class GameScene extends Scene {
             // ホールドノートの削除判定
             // 長いホールドノートが途中で消えないよう、endTimeに到達した場合のみ削除
             const shouldRemove = currentTime >= gameHold.holdData.endTime + 100; // 少し余裕を持たせる
-            
+
             if (shouldRemove) {
                 this.container.removeChild(gameHold.bodyGraphic);
                 this.container.removeChild(gameHold.endGraphic);
@@ -670,7 +712,7 @@ export class GameScene extends Scene {
             const spawnTime = note.time - (this.JUDGMENT_LINE_Y / this.NOTE_SPEED * 1000);
             if (currentTime >= spawnTime && currentTime <= spawnTime + 100) {
                 // まだスポーンしていないノートかチェック
-                const alreadySpawned = this.gameNotes.some(gn => 
+                const alreadySpawned = this.gameNotes.some(gn =>
                     gn.noteData.time === note.time && gn.noteData.position === note.position
                 );
                 if (!alreadySpawned) {
@@ -683,20 +725,20 @@ export class GameScene extends Scene {
         for (const hold of this.chart.holds) {
             const spawnTime = hold.startTime - (this.JUDGMENT_LINE_Y / this.NOTE_SPEED * 1000);
             if (currentTime >= spawnTime && currentTime <= spawnTime + 100) {
-                const alreadySpawned = this.gameHolds.some(gh => 
+                const alreadySpawned = this.gameHolds.some(gh =>
                     gh.holdData.startTime === hold.startTime && gh.holdData.position === hold.position
                 );
                 if (!alreadySpawned) {
-                    // ホールドの始点をタップノートとしてスポーン
+                    // まずホールドのボディとエンドをスポーン
+                    this.spawnHold(hold);
+
+                    // その後でホールドの始点をタップノートとしてスポーン
                     const startNote: Note = {
                         time: hold.startTime,
                         type: hold.type,
-                        position: hold.position
+                        position: hold.position,
                     };
-                    this.spawnNote(startNote);
-                    
-                    // ホールドのボディとエンドをスポーン
-                    this.spawnHold(hold);
+                    this.spawnNote(startNote, true);  // 第2引数でホールド始点フラグを渡す
                 }
             }
         }
@@ -744,30 +786,30 @@ export class GameScene extends Scene {
     private updateHoldProgress(gameHold: GameHold, deltaTime: number): void {
         // ゲーム開始からの経過時間を取得
         const currentTime = Date.now() - this.gameStartTime;
-        
+
         // ホールドノートの情報
         const holdStartTime = gameHold.holdData.startTime;
         const holdEndTime = gameHold.holdData.endTime;
         const duration = holdEndTime - holdStartTime;
-        
+
         // ボディの描画
         const width = this.LANE_WIDTH - 20;
-        
+
         // ボディを再描画
         gameHold.bodyGraphic.clear();
         const bodyColor = gameHold.holdData.type === 'critical' ? 0xf0ff66 : 0x66ffff;
-        
+
         if (gameHold.isActive && currentTime >= holdStartTime) {
             // キーが押されている間：実際の時間経過に基づいて消費
             // ホールドが始まってからの経過時間
             const elapsedSinceStart = currentTime - holdStartTime;
             const progressRatio = Math.max(0, Math.min(1, elapsedSinceStart / duration));
             gameHold.holdProgress = progressRatio;
-            
+
             // 上から徐々に消費される視覚効果
             const consumedHeight = gameHold.originalBodyHeight * progressRatio;
             const remainingHeight = gameHold.originalBodyHeight - consumedHeight;
-            
+
             if (remainingHeight > 0) {
                 // 残りの部分を描画（上の消費された部分は描画しない）
                 gameHold.bodyGraphic.rect(0, consumedHeight, width, remainingHeight).fill(bodyColor);
@@ -775,7 +817,7 @@ export class GameScene extends Scene {
         } else {
             // キーが離されている間、またはまだ始まっていない場合：フル描画
             gameHold.bodyGraphic.rect(0, 0, width, gameHold.originalBodyHeight).fill(bodyColor);
-            
+
             // キーが離されている場合は進行度を更新しない（時間は止まる）
             if (gameHold.isStartHit && currentTime >= holdStartTime) {
                 const elapsedSinceStart = currentTime - holdStartTime;
@@ -793,7 +835,11 @@ export class GameScene extends Scene {
     }
 
     private endGame(): void {
-        this.onSceneChange('result', { score: this.score });
+        this.onSceneChange('result', {
+            score: this.score,
+            missCount: this.missCount,
+            goodCount: this.goodCount
+        });
     }
 
     destroy(): void {
@@ -804,7 +850,7 @@ export class GameScene extends Scene {
         if ((this as any).keyupHandler) {
             document.removeEventListener('keyup', (this as any).keyupHandler);
         }
-        
+
         // ノートをクリーンアップ
         this.gameNotes.forEach(gameNote => {
             this.container.removeChild(gameNote.graphic);
@@ -843,14 +889,14 @@ export class GameScene extends Scene {
     async loadChartById(musicId: string): Promise<void> {
         this.musicId = musicId;
         this.chart = await ChartLoader.getChartById(musicId);
-        
+
         // BGM音声の準備
         if (this.musicId) {
             this.bgmSound = new Audio(`/charts/${this.musicId}/${this.musicId}.mp3`);
             this.bgmSound.volume = 0.5;
             this.bgmSound.preload = 'auto';
             this.bgmSound.autoplay = false; // 自動再生を明示的に無効化
-            
+
             // BGMの読み込み完了を待つ
             await this.waitForBGMLoad();
         }
@@ -870,11 +916,11 @@ export class GameScene extends Scene {
                     this.gameDuration = this.bgmSound.duration;
                     console.log(`Game duration set to BGM duration: ${this.gameDuration} seconds`);
                 }
-                
+
                 // 確実に再生を停止
                 this.bgmSound.pause();
                 this.bgmSound.currentTime = 0;
-                
+
                 this.bgmSound.removeEventListener('canplaythrough', onCanPlayThrough);
                 this.bgmSound.removeEventListener('error', onError);
                 resolve();
@@ -893,7 +939,7 @@ export class GameScene extends Scene {
             } else {
                 this.bgmSound.addEventListener('canplaythrough', onCanPlayThrough);
                 this.bgmSound.addEventListener('error', onError);
-                
+
                 // タイムアウト設定（5秒後に諦める）
                 setTimeout(() => {
                     console.warn('BGM load timeout, using default duration');

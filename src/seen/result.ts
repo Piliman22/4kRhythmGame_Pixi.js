@@ -3,12 +3,16 @@ import { Scene } from '../scene';
 
 export class ResultScene extends Scene {
     private score: number;
+    private missCount: number;
+    private goodCount: number;
     private onSceneChange!: (sceneName: string) => void;
 
-    constructor(app: PIXI.Application, onSceneChange: (sceneName: string) => void, score: number = 0) {
+    constructor(app: PIXI.Application, onSceneChange: (sceneName: string) => void, score: number = 0, missCount: number = 0, goodCount: number = 0) {
         super(app);
         this.onSceneChange = onSceneChange;
         this.score = score;
+        this.missCount = missCount;
+        this.goodCount = goodCount;
     }
 
     async start(): Promise<void> {
@@ -44,7 +48,7 @@ export class ResultScene extends Scene {
         this.container.addChild(scoreText);
 
         // ランク表示
-        const rank = this.calculateRank(this.score);
+        const rank = this.calculateRank(this.missCount, this.goodCount);
         const rankText = new PIXI.Text({
             text: `Rank: ${rank}`,
             style: {
@@ -94,8 +98,8 @@ export class ResultScene extends Scene {
 
         const bg = new PIXI.Graphics();
         bg.roundRect(0, 0, 140, 60, 10)
-          .fill(color)
-          .stroke({width: 2, color: 0xffffff});
+            .fill(color)
+            .stroke({ width: 2, color: 0xffffff });
         button.addChild(bg);
 
         const buttonText = new PIXI.Text({
@@ -113,23 +117,23 @@ export class ResultScene extends Scene {
         return button;
     }
 
-    private calculateRank(score: number): string {
-        if (score >= 3000) return 'S';
-        if (score >= 2500) return 'A';
-        if (score >= 2000) return 'B';
-        if (score >= 1500) return 'C';
-        if (score >= 1000) return 'D';
-        return 'E';
+    private calculateRank(miss: number, good: number): string {
+        const totalBadJudgments = miss + good;
+
+        if (totalBadJudgments <= 3) {
+            return 'A';
+        } else if (totalBadJudgments <= 20) {
+            return 'B';
+        } else {
+            return 'C';
+        }
     }
 
     private getRankColor(rank: string): number {
         switch (rank) {
-            case 'S': return 0xFFD700; // ゴールド
-            case 'A': return 0xFF4500; // オレンジレッド
-            case 'B': return 0x32CD32; // ライムグリーン
-            case 'C': return 0x00BFFF; // ディープスカイブルー
-            case 'D': return 0x9370DB; // ミディアムパープル
-            case 'E': return 0x808080; // グレー
+            case 'A': return 0xFFD700; // ゴールド
+            case 'B': return 0x00BFFF; // ブルー
+            case 'C': return 0x32CD32; // グリーン
             default: return 0xffffff;
         }
     }
