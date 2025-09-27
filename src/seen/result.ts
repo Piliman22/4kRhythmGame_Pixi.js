@@ -66,16 +66,6 @@ export class ResultScene extends Scene {
     }
 
     private createButtons(): void {
-        // もう一度プレイボタン
-        const retryButton = this.createButton('もう一度', 0x4CAF50);
-        retryButton.x = 200;
-        retryButton.y = 400;
-        retryButton.eventMode = 'static';
-        retryButton.cursor = 'pointer';
-        retryButton.on('pointerdown', () => {
-            this.onSceneChange('game');
-        });
-        this.container.addChild(retryButton);
 
         // 曲選択に戻るボタン
         const selectButton = this.createButton('曲選択', 0x2196F3);
@@ -89,7 +79,6 @@ export class ResultScene extends Scene {
         this.container.addChild(selectButton);
 
         // 保存用にボタンの参照を保持
-        (this as any).retryButton = retryButton;
         (this as any).selectButton = selectButton;
     }
 

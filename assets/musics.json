@@ -33,8 +33,35 @@
             "artist": "t+pazolite",
             "bpm": 150,
             "difficulty": "Hard",
-            "rating": 10,
+            "rating": 7,
             "chartIndex": 3
+        },
+        {
+            "id": "05",
+            "title": "月と狼",
+            "artist": "魔王魂",
+            "difficulty": "Hard",
+            "bpm": 158,
+            "rating": 6,
+            "chartIndex": 4
+        },
+        {
+            "id": "06",
+            "title": "いざ、参ります",
+            "artist": "U-ske feat. 棗いつき",
+            "difficulty": "Hard",
+            "bpm": 188,
+            "rating": 10,
+            "chartIndex": 5
+        },
+        {
+            "id": "07",
+            "title": "chess (slowed)",
+            "artist": "ジョイフル",
+            "difficulty": "Normal",
+            "bpm": 113,
+            "rating": 1,
+            "chartIndex": 6
         }
     ]
 }

@@ -63,6 +63,9 @@ export class GameScene extends Scene {
     private loadingText!: PIXI.Text;
     private gameReady: boolean = false;
 
+    // オフセット関連
+    private musicOffset: number = 0; // ミリ秒単位のオフセット
+
     // レーン設定
     private readonly LANE_COUNT = 4;
     private readonly LANE_WIDTH = 150;
@@ -106,7 +109,7 @@ export class GameScene extends Scene {
         // ゲーム開始時間を記録
         this.gameStartTime = Date.now();
 
-        // BGMを開始
+        // BGMを開始（オフセットを適用）
         this.startBGM();
     }
 
@@ -480,12 +483,12 @@ export class GameScene extends Scene {
             let judgment = '';
             let judgmentColor = 0xffffff;
 
-            if (closestDistance < 30) {
+            if (closestDistance < 20) {
                 points = closestNote.noteData.type === 'critical' ? 200 : 100;
                 hitType = closestNote.noteData.type === 'critical' ? 'critical' : 'normal';
                 judgment = 'JUST';
                 judgmentColor = 0x00ff00;
-            } else if (closestDistance < 45) {
+            } else if (closestDistance < 35) {
                 points = closestNote.noteData.type === 'critical' ? 150 : 75;
                 hitType = closestNote.noteData.type === 'critical' ? 'critical' : 'normal';
                 judgment = 'GREAT';
@@ -639,7 +642,7 @@ export class GameScene extends Scene {
         const remainingTime = Math.max(0, Math.ceil(this.gameDuration - this.gameTimer));
         this.timeText.text = `Time: ${remainingTime}`;
 
-        // 譜面からノートを生成
+        // 譜面からノートを生成（オフセットを適用）
         this.spawnNotesFromChart(currentTime);
 
         // ノートの更新
@@ -677,13 +680,8 @@ export class GameScene extends Scene {
                 gameHold.keyHeldDown = this.keysHeld[gameHold.holdData.position];
                 gameHold.isActive = gameHold.keyHeldDown;
 
-                if (gameHold.isActive) {
-                    // キーが押されている間は位置を固定（判定線の上端に）
-                    gameHold.positionY = this.JUDGMENT_LINE_Y - gameHold.originalBodyHeight;
-                } else {
-                    // キーが離されている場合は通常通り落下
-                    gameHold.positionY += this.NOTE_SPEED * deltaTime / 60;
-                }
+                // ホールドが開始されたら位置を固定（判定線の上端に）
+                gameHold.positionY = this.JUDGMENT_LINE_Y - gameHold.originalBodyHeight;
 
                 // 進行度を更新
                 this.updateHoldProgress(gameHold, deltaTime);
@@ -693,18 +691,10 @@ export class GameScene extends Scene {
             gameHold.bodyGraphic.y = gameHold.positionY;
 
             // ホールドノートの削除判定
-            const shouldRemove = currentTime >= gameHold.holdData.endTime + 100 || // endTimeに到達
-                               (gameHold.positionY > 650); // 画面外に出た（キーが離されて落下した場合）
+            // 長いホールドノートが途中で消えないよう、endTimeに到達した場合のみ削除
+            const shouldRemove = currentTime >= gameHold.holdData.endTime + 100; // 少し余裕を持たせる
 
             if (shouldRemove) {
-                // 画面外に出た場合はMISS判定
-                if (gameHold.positionY > 650 && gameHold.isStartHit && this.combo > 0) {
-                    this.combo = 0;
-                    this.updateCombo();
-                    this.showJudgment('MISS', 0xff0000);
-                    this.missCount++;
-                }
-                
                 this.container.removeChild(gameHold.bodyGraphic);
                 this.container.removeChild(gameHold.endGraphic);
                 this.gameHolds.splice(i, 1);
@@ -720,10 +710,13 @@ export class GameScene extends Scene {
     private spawnNotesFromChart(currentTime: number): void {
         if (!this.chart) return;
 
+        // オフセットを適用した現在時間
+        const adjustedTime = currentTime - this.musicOffset;
+
         // 通常ノートのスポーン
         for (const note of this.chart.notes) {
             const spawnTime = note.time - (this.JUDGMENT_LINE_Y / this.NOTE_SPEED * 1000);
-            if (currentTime >= spawnTime && currentTime <= spawnTime + 100) {
+            if (adjustedTime >= spawnTime && adjustedTime <= spawnTime + 100) {
                 // まだスポーンしていないノートかチェック
                 const alreadySpawned = this.gameNotes.some(gn =>
                     gn.noteData.time === note.time && gn.noteData.position === note.position
@@ -737,7 +730,7 @@ export class GameScene extends Scene {
         // ホールドノートのスポーン
         for (const hold of this.chart.holds) {
             const spawnTime = hold.startTime - (this.JUDGMENT_LINE_Y / this.NOTE_SPEED * 1000);
-            if (currentTime >= spawnTime && currentTime <= spawnTime + 100) {
+            if (adjustedTime >= spawnTime && adjustedTime <= spawnTime + 100) {
                 const alreadySpawned = this.gameHolds.some(gh =>
                     gh.holdData.startTime === hold.startTime && gh.holdData.position === hold.position
                 );
@@ -903,6 +896,15 @@ export class GameScene extends Scene {
         this.musicId = musicId;
         this.chart = await ChartLoader.getChartById(musicId);
 
+        // チャートからオフセットを取得
+        if (this.chart && this.chart.meta && this.chart.meta.offset) {
+            this.musicOffset = this.chart.meta.offset;
+            console.log(`Music offset set to: ${this.musicOffset}ms`);
+        } else {
+            this.musicOffset = 0;
+            console.log('No offset found, using 0ms');
+        }
+
         // BGM音声の準備
         if (this.musicId) {
             this.bgmSound = new Audio(`/charts/${this.musicId}/${this.musicId}.mp3`);
@@ -971,8 +973,26 @@ export class GameScene extends Scene {
                 // 確実に停止状態から開始
                 this.bgmSound.pause();
                 this.bgmSound.currentTime = 0;
-                this.bgmSound.play();
-                console.log('BGM started successfully');
+                
+                // オフセットを適用してBGM開始を遅延
+                if (this.musicOffset > 0) {
+                    // 正のオフセット（BGMを遅らせる）
+                    setTimeout(() => {
+                        if (this.bgmSound) {
+                            this.bgmSound.play();
+                            console.log(`BGM started with ${this.musicOffset}ms delay`);
+                        }
+                    }, this.musicOffset);
+                } else if (this.musicOffset < 0) {
+                    // 負のオフセット（BGMを早める）
+                    this.bgmSound.currentTime = Math.abs(this.musicOffset) / 1000;
+                    this.bgmSound.play();
+                    console.log(`BGM started with ${Math.abs(this.musicOffset)}ms advance`);
+                } else {
+                    // オフセットなし
+                    this.bgmSound.play();
+                    console.log('BGM started without offset');
+                }
             } catch (error) {
                 console.warn('BGM play failed:', error);
             }
