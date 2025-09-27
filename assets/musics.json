@@ -19,49 +19,58 @@
             "chartIndex": 1
         },
         {
+            "id": "07",
+            "title": "chess (slowed)",
+            "artist": "ジョイフル",
+            "difficulty": "Normal",
+            "bpm": 113,
+            "rating": 2,
+            "chartIndex": 2
+        },
+        {
+            "id": "08",
+            "title": "Aerial Palace",
+            "artist": "-",
+            "difficulty": "Normal",
+            "bpm": 190,
+            "rating": 4,
+            "chartIndex": 3
+        },
+        {
             "id": "03",
             "title": "12345",
             "artist": "魔王魂",
             "bpm": 195,
             "difficulty": "Hard",
             "rating": 7,
-            "chartIndex": 2
+            "chartIndex": 4
         },
         {
             "id": "04",
             "title": "Psyched Fevereiro",
             "artist": "t+pazolite",
             "bpm": 150,
-            "difficulty": "Hard",
+            "difficulty": "Expert",
             "rating": 7,
-            "chartIndex": 3
+            "chartIndex": 5
         },
         {
             "id": "05",
             "title": "月と狼",
             "artist": "魔王魂",
-            "difficulty": "Hard",
+            "difficulty": "Expert",
             "bpm": 158,
             "rating": 6,
-            "chartIndex": 4
+            "chartIndex": 6
         },
         {
             "id": "06",
             "title": "いざ、参ります",
             "artist": "U-ske feat. 棗いつき",
-            "difficulty": "Hard",
+            "difficulty": "Extend",
             "bpm": 188,
             "rating": 10,
-            "chartIndex": 5
-        },
-        {
-            "id": "07",
-            "title": "chess (slowed)",
-            "artist": "ジョイフル",
-            "difficulty": "Normal",
-            "bpm": 113,
-            "rating": 1,
-            "chartIndex": 6
+            "chartIndex": 7
         }
     ]
 }

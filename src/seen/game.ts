@@ -114,19 +114,20 @@ export class GameScene extends Scene {
     }
 
     private async waitForGameReady(): Promise<void> {
-        // BGMが既に読み込まれている場合は即座に完了
         if (this.bgmSound && this.bgmSound.readyState >= 3) {
+            console.log('BGM is already loaded');
             return;
         }
 
-        // BGMの読み込み完了を待つ
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             if (!this.bgmSound) {
+                console.warn('BGM sound is not initialized');
                 resolve();
                 return;
             }
 
             const onCanPlay = () => {
+                console.log('BGM canplaythrough event fired');
                 this.bgmSound.removeEventListener('canplaythrough', onCanPlay);
                 this.bgmSound.removeEventListener('error', onError);
                 resolve();
@@ -139,20 +140,16 @@ export class GameScene extends Scene {
                 resolve();
             };
 
-            if (this.bgmSound.readyState >= 3) {
-                resolve();
-            } else {
-                this.bgmSound.addEventListener('canplaythrough', onCanPlay);
-                this.bgmSound.addEventListener('error', onError);
+            this.bgmSound.addEventListener('canplaythrough', onCanPlay);
+            this.bgmSound.addEventListener('error', onError);
 
-                // タイムアウト（10秒後に諦める）
-                setTimeout(() => {
-                    console.warn('BGM load timeout, continuing without BGM');
-                    this.bgmSound.removeEventListener('canplaythrough', onCanPlay);
-                    this.bgmSound.removeEventListener('error', onError);
-                    resolve();
-                }, 10000);
-            }
+            // タイムアウトを延長（20秒に設定）
+            setTimeout(() => {
+                console.warn('BGM load timeout, continuing without BGM');
+                this.bgmSound.removeEventListener('canplaythrough', onCanPlay);
+                this.bgmSound.removeEventListener('error', onError);
+                resolve();
+            }, 20000); // 20秒
         });
     }
 
@@ -364,12 +361,25 @@ export class GameScene extends Scene {
         this.criticalSound.volume = 0.8;
         this.criticalSound.preload = 'auto';
 
-        // BGM音声の準備（楽曲IDがある場合）
         if (this.musicId) {
             this.bgmSound = new Audio(`/charts/${this.musicId}/${this.musicId}.mp3`);
             this.bgmSound.volume = 0.5;
             this.bgmSound.preload = 'auto';
             this.bgmSound.autoplay = false; // 自動再生を明示的に無効化
+
+            // 再生準備完了を確認
+            this.bgmSound.addEventListener('canplaythrough', () => {
+                console.log('BGM canplaythrough event fired');
+                this.bgmSound.currentTime = this.musicOffset / 1000; // ミリ秒を秒に変換
+                console.log(`BGM currentTime set to: ${this.bgmSound.currentTime}`);
+            }, { once: true });
+
+            // 再生開始
+            this.bgmSound.play().then(() => {
+                console.log('BGM started with offset applied');
+            }).catch((error) => {
+                console.error('BGM play failed:', error);
+            });
         }
     }
 
@@ -416,7 +426,7 @@ export class GameScene extends Scene {
         const gameNote: GameNote = {
             graphic: note,
             noteData: noteData,
-            startTime: Date.now(),
+            startTime: noteData.time, // 修正: noteData.time を使用
             isHoldStart: isHoldStart  // フラグを設定
         };
 
@@ -467,6 +477,26 @@ export class GameScene extends Scene {
             if (closestNote.isHoldStart) {
                 console.log('hold start');
                 this.checkHoldStart(lane, closestNote.noteData.time);
+                // 削除対象のノートを特定するための詳細ログ
+                console.log('Before removal, gameNotes:', this.gameNotes);
+                console.log('Attempting to remove note:', closestNote);
+
+                // ホールド始点ノートを削除する
+                this.container.removeChild(closestNote.graphic);
+                // findIndex を使用して noteData で一致するノートを検索
+                const index = this.gameNotes.findIndex(note => 
+                    note.noteData.time === closestNote.noteData.time &&
+                    note.noteData.position === closestNote.noteData.position &&
+                    note.noteData.type === closestNote.noteData.type
+                );
+
+                if (index > -1) {
+                    this.container.removeChild(this.gameNotes[index].graphic);
+                    this.gameNotes.splice(index, 1);
+                    console.log('After removal, gameNotes:', this.gameNotes);
+                } else {
+                    console.warn('Hold start note not found in gameNotes array.');
+                }
             }
 
             // 通常の削除処理
@@ -973,7 +1003,7 @@ export class GameScene extends Scene {
                 // 確実に停止状態から開始
                 this.bgmSound.pause();
                 this.bgmSound.currentTime = 0;
-                
+
                 // オフセットを適用してBGM開始を遅延
                 if (this.musicOffset > 0) {
                     // 正のオフセット（BGMを遅らせる）
